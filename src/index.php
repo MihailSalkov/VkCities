@@ -1,62 +1,80 @@
 <?php
 
+new VkCities();
+
 class VkCities {
+    const SAVE_PATH = '../dist';
     const ACCESS_TOKEN = '';
-    const LANG = 0; // 0 - ru
-    const VERSION = '5.102';
+    const DEFAULT_LANG = 0;
+    const LANGS = [
+        0 => 'ru',
+        3 => 'en',
+    ];
+    const VERSION = '5.103';
     const LIMIT = 1000;
+
+    static $queries_count = 0;
 
     function __construct() {
         set_time_limit(0);
 
-        $countries = $this->run();
+        echo 'Langs: ' . implode(', ', self::LANGS) . "\n";
+
+        $this->run();
+
+        echo 'Queries count: ' . self::$queries_count . "\n";
 
         echo "Done.";
     }
 
     function run() {
-        $vk_countries = self::query('database.getCountries');
-        $all_countries = count($vk_countries);
+        $countries = self::getCountries();
+        $countries_count = count($countries);
+        $cities_count = 0;
 
-        $countries = [];
+        $i = 0;
 
-        echo "Countries: {$all_countries}\n";
+        echo "Countries: {$countries_count}\n";
 
-        foreach ($vk_countries as $country) {
+        self::saveCountries(array_values($countries));
+
+        foreach ($countries as $country) {
             $i++;
+
+            echo "({$i}/{$countries_count}) ";
+            echo "Country #{$country['id']}'" . $country['title_' . self::LANGS[0]] . "\n";
+
             $cities = self::getCities($country['id']);
+            $cities_count += count($cities);
 
-            $countries[] = [
-                'id'    => $country['id'],
-                'title' => $country['title'],
-            ];
+            self::saveCountry($country['id'], $country + [
+                    'cities' => $cities,
+                ]);
 
-            self::saveCountry($country['id'], [
-                'title'  => $country['title'],
-                'cities' => $cities,
-            ]);
-
-            echo "({$i}/{$all_countries}) ";
-            echo "Saved country #" . $country['id'] . "'" . $country['title'] . "' (" . count($cities) . " cities)\n";
+            echo "Saved " . count($cities) . " cities\n";
         }
 
-        self::saveCountries($countries);
+        echo "\nCountries: {$countries_count}. Cities: {$cities_count}\n";
 
         return $countries;
     }
 
-    static function saveCountries($countries) {
-        return file_put_contents(
-            '../dist/countries.json',
-            json_encode($countries, JSON_UNESCAPED_UNICODE)
-        );
-    }
+    static function getCountries() {
+        $countries = [];
 
-    static function saveCountry($id, $country) {
-        return file_put_contents(
-            '../dist/countries/' . $id . '.json',
-            json_encode($country, JSON_UNESCAPED_UNICODE)
-        );
+        foreach (self::LANGS as $lang_id => $lang_name) {
+            $vk_countries = self::vk_method('database.getCountries', [
+                'lang' => $lang_id,
+            ]);
+
+            foreach ($vk_countries as $country) {
+                $country['id'] = intval($country['id']);
+                $countries[$country['id']]['id'] = $country['id'];
+                $countries[$country['id']]['title_' . $lang_name] = $country['title'];
+            }
+        }
+
+        return $countries;
     }
 
     static function getCities($country_id) {
@@ -75,26 +93,48 @@ class VkCities {
     }
 
     static function getCitiesPart($country_id, $offset = 0) {
-        $cities = self::query('database.getCities', [
-            'country_id' => $country_id,
-            'offset'     => $offset,
-        ]);
+        $result = [];
 
-        return array_map(function ($city) {
-            return $city['title'];
-        }, $cities);
+        foreach (self::LANGS as $lang_id => $lang_name) {
+            $cities = self::vk_method('database.getCities', [
+                'country_id' => $country_id,
+                'offset'     => $offset,
+                'lang'       => $lang_id,
+            ]);
+
+            foreach ($cities as $city) {
+                $result[$city['id']]['id'] = $city['id'];
+                $result[$city['id']]['title_' . $lang_name] = $city['title'];
+            }
+        }
+
+        return $result;
     }
 
-    static function query($method, $params = []) {
+    static function saveCountries($countries) {
+        return file_put_contents(
+            self::SAVE_PATH . '/countries.json',
+            json_encode($countries, JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    static function saveCountry($id, $country) {
+        return file_put_contents(
+            self::SAVE_PATH . "/countries/{$id}.json",
+            json_encode($country, JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    static function vk_method($method, $params = []) {
         $common_params = [
             'v'            => self::VERSION,
-            'lang'         => self::LANG,
+            'lang'         => self::DEFAULT_LANG,
             'access_token' => self::ACCESS_TOKEN,
             'count'        => self::LIMIT,
             'need_all'     => 1,
         ];
 
-        $params = array_merge($params, $common_params);
+        $params = array_merge($common_params, $params);
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://api.vk.com/method/' . $method);
@@ -107,6 +147,8 @@ class VkCities {
 
         curl_close($ch);
 
+        self::$queries_count++;
+
         if (!isset($response['response'])) {
             exit(json_encode($response));
         }
@@ -114,5 +156,3 @@ class VkCities {
         return $response['response']['items'];
     }
 }
-
-new VkCities();

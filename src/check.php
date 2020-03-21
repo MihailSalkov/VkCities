@@ -1,5 +1,7 @@
 <?php
 
+new CitiesCheck();
+
 class CitiesCheck {
     function __construct() {
         $cities_count = 0;
@@ -25,5 +27,3 @@ class CitiesCheck {
         return $countries;
     }
 }
-
-new CitiesCheck();

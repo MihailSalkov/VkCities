@@ -5,20 +5,20 @@ new VkCities();
 class VkCities {
     const SAVE_PATH = '../dist';
     const ACCESS_TOKEN = '';
+    const VERSION = '5.103';
     const DEFAULT_LANG = 0;
+    const LIMIT = 1000;
     const LANGS = [
         0 => 'ru',
         3 => 'en',
     ];
-    const VERSION = '5.103';
-    const LIMIT = 1000;
 
     static $queries_count = 0;
 
     function __construct() {
         set_time_limit(0);
 
-        echo 'Langs: ' . implode(', ', self::LANGS) . "\n";
+        echo 'Languages: ' . implode(', ', self::LANGS) . "\n";
 
         $this->run();
 
@@ -42,7 +42,7 @@ class VkCities {
             $i++;
 
             echo "({$i}/{$countries_count}) ";
-            echo "Country #{$country['id']}'" . $country['title_' . self::LANGS[0]] . "\n";
+            echo "Loading country #{$country['id']}'" . $country['title_' . self::LANGS[self::DEFAULT_LANG]] . "'...\n";
 
             $cities = self::getCities($country['id']);
             $cities_count += count($cities);
@@ -81,28 +81,44 @@ class VkCities {
         $cities = [];
 
         $offset = 0;
-        do {
+        while (true) {
             $cities_append = self::getCitiesPart($country_id, $offset);
+
+            if (!count($cities_append))
+                break;
 
             $cities = array_merge($cities, $cities_append);
 
             $offset += self::LIMIT;
-        } while (count($cities) == $offset);
+
+            if ($offset % (self::LIMIT * 10) == 0) {
+                echo "Loaded cities: {$offset}...\n";
+            }
+        }
 
         return $cities;
     }
 
     static function getCitiesPart($country_id, $offset = 0) {
-        $result = [];
+        $cities = self::vk_method('database.getCities', [
+            'country_id' => $country_id,
+            'offset'     => $offset,
+        ]);
 
+        $city_ids = [];
+        foreach ($cities as $city) {
+            $city_ids[] = $city['id'];
+        }
+        $city_ids = implode(',', $city_ids);
+
+        $result = [];
         foreach (self::LANGS as $lang_id => $lang_name) {
-            $cities = self::vk_method('database.getCities', [
-                'country_id' => $country_id,
-                'offset'     => $offset,
-                'lang'       => $lang_id,
+            $cities_lang = self::vk_method('database.getCitiesById', [
+                'city_ids' => $city_ids,
+                'lang'     => $lang_id,
             ]);
 
-            foreach ($cities as $city) {
+            foreach ($cities_lang as $city) {
                 $result[$city['id']]['id'] = $city['id'];
                 $result[$city['id']]['title_' . $lang_name] = $city['title'];
             }
@@ -153,6 +169,8 @@ class VkCities {
             exit(json_encode($response));
         }
 
-        return $response['response']['items'];
+        $response = $response['response'];
+
+        return $response['items'] ?? $response;
     }
 }

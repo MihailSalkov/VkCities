@@ -5,8 +5,8 @@ class Load {
         0 => 'ru',
         3 => 'en',
     ];
-    const ACCESS_TOKEN = 'd24519a8d24519a8d24519a877d21c60d5dd245d24519a88c333c0ebb608b3b6ef524f4';
-    const VERSION = '5.103';
+    const ACCESS_TOKEN = '';
+    const VERSION = '5.124';
     const DEFAULT_LANG = 0;
     const LIMIT = 1000;
     static $queries_count = 0;
@@ -32,23 +32,20 @@ class Load {
     static function getRegions($country_id) {
         $regions = [];
 
-        $offset = 0;
-        while (true) {
-            $regions_append = self::getRegionsPart($country_id, $offset);
+        foreach (self::LANGS as $lang_id => $lang_name) {
+            $regions_lang = self::vk_method('database.getRegions', [
+                'country_id' => $country_id,
+                'lang'       => $lang_id,
+            ]);
 
-            if (!count($regions_append))
-                break;
-
-            $regions = array_merge($regions, $regions_append);
-
-            $offset += self::LIMIT;
-
-            if ($offset % (self::LIMIT * 10) == 0) {
-                echo "Loaded cities: {$offset}...\n";
+            foreach ($regions_lang as $region) {
+                $region['id'] = intval($region['id']);
+                $regions[$region['id']]['id'] = $region['id'];
+                $regions[$region['id']]['title_' . $lang_name] = $region['title'];
             }
         }
 
-        return $regions;
+        return array_values($regions);
     }
 
     static function getCities($country_id, $region_id = 0) {
@@ -71,34 +68,6 @@ class Load {
         }
 
         return $cities;
-    }
-
-    static private function getRegionsPart($country_id, $offset = 0) {
-        $regions = self::vk_method('database.getRegions', [
-            'country_id' => $country_id,
-            'offset'     => $offset,
-        ]);
-
-        $region_ids = [];
-        foreach ($regions as $region) {
-            $region_ids[] = $region['id'];
-        }
-        $region_ids = implode(',', $region_ids);
-
-        $result = [];
-        foreach (self::LANGS as $lang_id => $lang_name) {
-            $regions_lang = self::vk_method('database.getCitiesById', [
-                'city_ids' => $region_ids,
-                'lang'     => $lang_id,
-            ]);
-
-            foreach ($regions_lang as $region) {
-                $result[$region['id']]['id'] = $region['id'];
-                $result[$region['id']]['title_' . $lang_name] = $region['title'];
-            }
-        }
-
-        return $result;
     }
 
     static private function getCitiesPart($country_id, $region_id = 0, $offset = 0) {

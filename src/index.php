@@ -35,16 +35,15 @@ class VkCities {
         foreach ($countries as $country) {
             $i++;
 
-            if ($i != 159) continue;
+            if ($country['id'] != 1) continue;
 
             echo "({$i}/{$countries_count} countries) ";
             echo "Loading country #{$country['id']}'" . $country['title_' . $default_lang] . "'...\n";
 
+            $country['cities_count'] = 0;
             $country['regions'] = Load::getRegions($country['id']);
             $regions_count = count($country['regions']);
             $regions_count_all += $regions_count;
-
-            Save::saveCountry($country['id'], $country);
 
             $j = 0;
             foreach ($country['regions'] as $region) {
@@ -54,12 +53,16 @@ class VkCities {
                 echo "Loading region #{$region['id']} " . $region['title_' . $default_lang] . "... ";
 
                 $region['cities'] = Load::getCities($country['id'], $region['id']);
-                $cities_count_all += count($region['cities']);
+                $country['cities_count'] += count($region['cities']);
 
                 Save::saveRegion($country['id'], $region['id'], $region['cities']);
 
                 echo "(Saved " . count($region['cities']) . " cities)\n";
             }
+
+            Save::saveCountry($country['id'], $country);
+
+            $cities_count_all += $country['cities_count'];
 
             echo "Saved " . count($country['regions']) . " regions\n";
         }

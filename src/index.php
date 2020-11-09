@@ -21,7 +21,6 @@ class VkCities {
     function run() {
         $countries = Load::getCountries();
         $countries_count = count($countries);
-        $regions_count = 0;
         $regions_count_all = 0;
         $cities_count_all = 0;
         $default_lang = Load::LANGS[Load::DEFAULT_LANG];

@@ -32,6 +32,19 @@ class Load {
     static function getRegions($country_id) {
         $regions = [];
 
+        if ($country_id == 1) {
+            $regions[1] = [
+                'id'       => 1,
+                'title_ru' => 'Москва',
+                'title_en' => 'Москва',
+            ];
+            $regions[2] = [
+                'id'       => 2,
+                'title_ru' => 'Санкт-Петербург',
+                'title_en' => 'Санкт-Петербург',
+            ];
+        }
+
         foreach (self::LANGS as $lang_id => $lang_name) {
             $regions_lang = self::vk_method('database.getRegions', [
                 'country_id' => $country_id,
